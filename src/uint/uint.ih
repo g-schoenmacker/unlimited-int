@@ -1,0 +1,16 @@
+#include "uint.h"
+
+// Private inline UInt method to remove leading zeroes.
+inline void Unlimited::UInt::remove_leading_zeroes() {
+  size_t len = d_number.size() - 1;
+  while (len && !d_number[len])
+    d_number.erase(d_number.begin() + len--);
+}
+
+#include <istream>
+#include <ostream>
+#include <sstream>
+#include <string>
+
+#include "../int/int.h"
+#include "../str_uint/str_uint.h"

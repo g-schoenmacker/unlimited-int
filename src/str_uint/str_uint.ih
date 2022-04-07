@@ -1,0 +1,17 @@
+// ############################################################################
+// Internal header file for the Str_UInt class.
+// ############################################################################
+
+#include "str_uint.h"
+
+// Private Str_UInt method to remove leading zeroes.
+inline void Unlimited::Str_UInt::remove_leading_zeroes() {
+  size_t len = length() - 1;
+  while (len && d_number[len] == '0')
+    d_number.erase(len--, 1);
+}
+
+#include <algorithm>
+#include <istream>
+#include <ostream>
+#include <sstream>
