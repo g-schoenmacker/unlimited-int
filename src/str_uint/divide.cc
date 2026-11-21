@@ -16,6 +16,14 @@ void Unlimited::Str_UInt::divide(
   if (!oth)
     throw Exception("divide error: Division by zero");
 
+  if (&res == this || &res == &oth || &mod == this || &mod == &oth) {
+    Str_UInt tmp_res, tmp_mod;
+    divide(oth, tmp_res, tmp_mod);
+    res = tmp_res;
+    mod = tmp_mod;
+    return;
+  }
+
   // Initialise output arguments.
   res = Str_UInt(0);
   mod = *this;
@@ -27,7 +35,7 @@ void Unlimited::Str_UInt::divide(
   // multiplied by [oth], is this smaller than [mod].
   // When found, we add this [factor] to [res] and subtract [mod_diff] from
   // [mod]. This is done as long as [mod] > [oth], othwise, we're done.
-  while (mod > oth) {
+  while (mod >= oth) {
     size_t const m_len = mod.d_number.length();
 
     // Initialise [pow_10] to be 10 to the power of [m_len] - [o_len].

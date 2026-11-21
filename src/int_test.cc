@@ -1,12 +1,22 @@
 #include "int/int.h"
 #include "uint/uint.h"
 #include <cassert>
+#include <climits>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <vector>
 
 using namespace Unlimited;
+
+static Int twos(unsigned long long val) {
+  return val >> 63 ? -Int(UInt(~val + 1)) : Int(UInt(val));
+}
+
+static Int floor_shift(long long val, unsigned shift) {
+  long long const div = 1LL << shift;
+  return Int(val / div - (val % div < 0));
+}
 
 void int_test() {
 
@@ -268,43 +278,43 @@ void int_test() {
   std::cout << "Testing right shift operator...\n";
   assert((Int("-4142522431438848") >> 25) == Int("-123456789"));
   assert((Int("-123456789") >> 0) == Int("-123456789"));
-  assert((Int("-123456789") >> 1) == Int("-61728394"));
+  assert((Int("-123456789") >> 1) == Int("-61728395"));
   assert((Int("-987654321987654321987654321987654321") >> 40) ==
-         Int("-898266373030905308030609"));
+         Int("-898266373030905308030610"));
   assert((big >>= 3) ==
          Int("2489710700611134398732558402699595704578172006456748"));
 
   std::cout << "Testing bitwise AND operator...\n";
 
-  assert((Int("-123456789") & Int("987654321")) == Int("39471121"));
+  assert((Int("-123456789") & Int("987654321")) == Int("948183201"));
   assert((Int("-123456789123456789123456789") & Int("-987654321987654321")) ==
-         Int("-45194461172732433"));
+         Int("-123456790065916649938378677"));
   assert((Int("987654321987654321") & Int("-123456789123456789123456789")) ==
-         Int("45194461172732433"));
+         Int("942459860814921889"));
   assert((Int("123456789") & Int(-0)) == Int(0));
-  assert((Int("-123456789") & Int(-1)) == Int(-1));
+  assert((Int("-123456789") & Int(-1)) == Int("-123456789"));
   assert((big &= mod) == Int("152342437133404011517188"));
 
   std::cout << "Testing bitwise OR operator...\n";
 
-  assert((Int("123456789") | Int("-987654321")) == Int("-1071639989"));
+  assert((Int("123456789") | Int("-987654321")) == Int("-948183201"));
   assert((Int("-123456789123456789123456789") | Int("987654321987654321")) ==
-         Int("-123456790065916649938378677"));
+         Int("-123456789078262327950724357"));
   assert((Int("-987654321987654321") | Int("-123456789123456789123456789")) ==
-         Int("-123456790065916649938378677"));
+         Int("-45194461172732433"));
   assert((Int("-123456789") | Int(0)) == Int("-123456789"));
-  assert((Int("123456789") | Int(-2)) == Int("-123456791"));
+  assert((Int("123456789") | Int(-2)) == Int(-1));
   assert((big |= mod) == Int("64868103064868103064868103"));
 
   std::cout << "Testing bitwise XOR operator...\n";
-  assert((Int("-123456789") ^ Int("987654321")) == Int("-1032168868"));
+  assert((Int("-123456789") ^ Int("987654321")) == Int("-1032168870"));
   assert((Int("-123456789123456789123456789") ^ Int("-987654321987654321")) ==
          Int("123456790020722188765646244"));
   assert((Int("987654321987654321") ^ Int("-123456789123456789123456789")) ==
-         Int("-123456790020722188765646244"));
+         Int("-123456790020722188765646246"));
   assert((Int("123456789") ^ Int(-0)) == Int("123456789"));
-  assert((Int("123456789") ^ Int(-1)) == Int("-123456788"));
-  assert((Int("-123456789") ^ Int(-2)) == Int("123456791"));
+  assert((Int("123456789") ^ Int(-1)) == Int("-123456790"));
+  assert((Int("-123456789") ^ Int(-2)) == Int("123456789"));
   assert((big ^= mod) == Int(0));
 
   std::cout << "Testing bit setting methods...\n";
@@ -351,6 +361,167 @@ void int_test() {
 
   assert(Int("1234567").ll() == 1234567);
   assert(Int("-1234567").ll() == -1234567);
+
+  std::cout << "Testing long long conversion of large values...\n";
+  assert(Int(1LL << 56).ll() == 1LL << 56);
+  assert(Int(1LL << 60).ll() == 1LL << 60);
+  assert(Int(-(1LL << 60)).ll() == -(1LL << 60));
+  assert(Int(LLONG_MAX).ll() == LLONG_MAX);
+  assert(Int(LLONG_MIN + 1).ll() == LLONG_MIN + 1);
+  assert(Int(LLONG_MIN).ll() == LLONG_MIN);
+  assert(Int("9223372036854775807").ll() == LLONG_MAX);
+
+  // Negating LLONG_MIN is undefined behaviour, so whether this fails depends
+  // on the optimiser; -fsanitize=undefined always catches it.
+  std::cout << "Testing construction from LLONG_MIN...\n";
+  assert(Int(LLONG_MIN).str() == "-9223372036854775808");
+  assert(Int(LLONG_MIN) == Int("-9223372036854775808"));
+
+  std::cout << "Testing results of zero are never negative...\n";
+  assert(Int(-5) * Int(0) == Int(0));
+  assert(Int(0) * Int(-5) == Int(0));
+  assert((Int(-5) * Int(0)).str() == "0");
+  {
+    Int val(-5);
+    val *= 0;
+    assert(val == Int(0));
+    assert(val.str() == "0");
+  }
+  assert(Int(0) / Int(-5) == Int(0));
+  assert((Int(0) / Int(-5)).str() == "0");
+  assert(Int(0) % Int(-5) == Int(0));
+  assert((Int(-1) >> 1).str() != "-0");
+  assert((Int(-5) ^ Int(5)).str() != "-0");
+  assert((Int(-5) & Int(-2)).str() != "-0");
+  {
+    Int val(-1);
+    val.set_bit(0, 0);
+    assert(val.str() != "-0");
+  }
+
+  std::cout << "Testing right shift past all bits...\n";
+  assert((Int(5) >> 100) == Int(0));
+  assert((Int("987654321987654321987654321") >> 1000) == Int(0));
+
+  std::cout << "Testing stream extract failure...\n";
+  {
+    std::istringstream bad("abc");
+    Int val(7);
+    bool threw = false;
+    try {
+      bad >> val;
+    } catch (...) {
+      threw = true;
+    }
+    assert(!threw);
+    assert(bad.fail());
+  }
+
+  // "Do as the ints do": bitwise operators follow two's complement semantics.
+  std::cout << "Testing bitwise operators match int semantics...\n";
+  assert((Int(-1) | Int(2)) == Int(-1));
+  assert((Int(-2) & Int(3)) == Int(2));
+  assert((Int(-5) ^ Int(3)) == Int(-8));
+  assert((Int(-1) >> 1) == Int(-1));
+  assert((Int(-7) >> 1) == Int(-4));
+  assert((Int(-5) >> 100) == Int(-1));
+  for (long long lhs = -20; lhs <= 20; ++lhs) {
+    unsigned long long const ulhs = lhs;
+    for (long long rhs = -20; rhs <= 20; ++rhs) {
+      unsigned long long const urhs = rhs;
+      assert((Int(lhs) & Int(rhs)) == twos(ulhs & urhs));
+      assert((Int(lhs) | Int(rhs)) == twos(ulhs | urhs));
+      assert((Int(lhs) ^ Int(rhs)) == twos(ulhs ^ urhs));
+    }
+    for (unsigned shift = 0; shift < 8; ++shift) {
+      assert((Int(lhs) >> shift) == floor_shift(lhs, shift));
+      assert((Int(lhs) << shift) == Int(lhs * (1LL << shift)));
+    }
+  }
+  std::vector<std::string> set_c = {
+      "0", "-1", "987654321987654321", "-123456789123456789123456789",
+      "-18446744073709551616", "340282366920938463463374607431768211455"};
+  for (size_t idx = 0; idx < set_c.size(); ++idx) {
+    Int const a(set_c[idx]);
+    assert((a ^ Int(-1)) == -a - 1);
+    for (unsigned shift = 0; shift < 140; shift += 7) {
+      Int const rem = a - ((a >> shift) << shift);
+      assert(rem >= 0 && rem < (Int(1) << shift));
+    }
+    for (size_t odx = 0; odx < set_c.size(); ++odx) {
+      Int const b(set_c[odx]);
+      assert((a & b) == (b & a));
+      assert(a + b == (a ^ b) + Int(2) * (a & b));
+      assert((a | b) == (a ^ b) + (a & b));
+    }
+  }
+
+  std::cout << "Testing bit access matches int semantics...\n";
+  assert(Int(-1).bit(0));
+  assert(Int(-1).bit(5));
+  assert(Int(-1).bit(1000));
+  assert(!Int(-2).bit(0));
+  assert(Int(-2).bit(1));
+  assert(!Int(-8).bit(2));
+  assert(Int(-8).bit(3));
+  assert(Int(-8).bit(4));
+  {
+    Int val(-1);
+    val.set_bit(5, 0);
+    assert(val == Int(-33));
+    val.set_bit(5, 1);
+    assert(val == Int(-1));
+    val.set_bit(0, 0);
+    assert(val == Int(-2));
+    val.set_bit(100, 0);
+    assert(val == -(Int(1) << 100) - 2);
+  }
+  for (long long val = -40; val <= 40; ++val) {
+    unsigned long long const uval = val;
+    for (unsigned pos = 0; pos < 63; ++pos) {
+      assert(Int(val).bit(pos) == bool((uval >> pos) & 1));
+      Int set(val), clear(val);
+      set.set_bit(pos, 1);
+      clear.set_bit(pos, 0);
+      assert(set == twos(uval | (1ULL << pos)));
+      assert(clear == twos(uval & ~(1ULL << pos)));
+    }
+    for (unsigned pos = 63; pos < 200; pos += 17)
+      assert(Int(val).bit(pos) == (val < 0));
+  }
+  for (size_t idx = 0; idx < set_c.size(); ++idx) {
+    Int const a(set_c[idx]);
+    for (unsigned pos = 0; pos < 200; pos += 3) {
+      Int const mask = Int(1) << pos;
+      assert(a.bit(pos) == bool(a & mask));
+      Int set(a), clear(a);
+      set.set_bit(pos, 1);
+      clear.set_bit(pos, 0);
+      assert(set == (a | mask));
+      assert(clear == (a & (-mask - 1)));
+      assert(set.bit(pos) && !clear.bit(pos));
+    }
+  }
+
+  std::cout << "Testing divide with aliased arguments...\n";
+  {
+    Int num(-17), den(5), res, mod;
+    num.divide(den, num, mod);
+    assert(num == Int(-4) && mod == Int(3));
+    num = -17;
+    num.divide(den, res, den);
+    assert(res == Int(-4) && den == Int(3));
+    num = -17;
+    num.divide(num, res, num);
+    assert(res == Int(1) && num == Int(0));
+    num = 17;
+    den = -5;
+    num.divide(den, den, num);
+    assert(den == Int(-4) && num == Int(-3));
+  }
+
+  std::cout << "Testing string construction of large numbers...\n";
+  assert(Int("-1" + std::string(10000, '0')) == -Int(10).powc(10000));
 
   std::cout << "\n ----- End Int tests ----- \n\n";
 }

@@ -23,6 +23,7 @@ namespace Unlimited {
 class Str_UInt;
 bool operator<(Str_UInt const &, Str_UInt const &);
 bool operator>(Str_UInt const &, Str_UInt const &);
+bool operator>=(Str_UInt const &, Str_UInt const &);
 
 class Str_UInt {
 
@@ -53,6 +54,9 @@ public:
 
   // ####################################################################
   Str_UInt &operator+=(Str_UInt const &oth) {
+    if (this == &oth)
+      return *this += Str_UInt(oth);
+
     size_t const o_len = oth.length();
     if (length() < o_len)
       d_number += std::string(o_len - length(), '0');
@@ -121,13 +125,21 @@ public:
     if (!oth)
       throw Exception("divide error: Division by zero");
 
+    if (&res == this || &res == &oth || &mod == this || &mod == &oth) {
+      Str_UInt tmp_res, tmp_mod;
+      divide(oth, tmp_res, tmp_mod);
+      res = tmp_res;
+      mod = tmp_mod;
+      return;
+    }
+
     res = Str_UInt(0);
     mod = *this;
 
     size_t const o_len = oth.d_number.length();
     size_t const o_sig = oth.d_number[o_len - 1] - '0';
 
-    while (mod > oth) {
+    while (mod >= oth) {
       size_t const m_len = mod.d_number.length();
       Str_UInt pow_10(std::string("1") + std::string(m_len - o_len, '0'));
 
@@ -273,7 +285,7 @@ inline std::istream &operator>>(std::istream &is, Str_UInt &s) {
 
     s = Str_UInt(temp);
   } catch (Str_UInt::Exception &e) {
-    is.exceptions(std::istream::failbit);
+    is.setstate(std::istream::failbit);
   }
 
   return is;
@@ -370,7 +382,7 @@ public:
   }
 
   // ####################################################################
-  explicit UInt(std::string const &inp) {
+  explicit UInt(std::string const &inp) : d_number(1) {
     Str_UInt val;
     try {
       val = Str_UInt(inp);
@@ -378,19 +390,19 @@ public:
       throw Exception(e.what());
     }
 
-    if (!val)
-      d_number.push_back(0);
+    std::string const digits(val.str());
+    for (size_t idx = 0; idx < digits.size(); idx += 9) {
+      UInt_t scale = 1;
+      UInt_t chunk = 0;
+      for (size_t cidx = idx; cidx < idx + 9 && cidx < digits.size(); ++cidx) {
+        scale *= 10;
+        chunk = chunk * 10 + (digits[cidx] - '0');
+      }
 
-    while (val) {
-      Str_UInt div, mod;
-      val.divide(UInt_t(1) << (sizeof(UInt_t) * 4), div, mod);
-
-      std::istringstream ss(mod.str());
-      UInt_t temp;
-      ss >> temp;
-
-      d_number.push_back(temp);
-      val = div;
+      for (size_t nidx = 0; nidx < d_number.size(); ++nidx)
+        d_number[nidx] *= scale;
+      d_number[0] += chunk;
+      consolidate();
     }
   }
 
@@ -460,6 +472,14 @@ public:
 
     if (!oth)
       throw Exception("divide error: Division by zero");
+
+    if (&res == this || &res == &oth || &mod == this || &mod == &oth) {
+      UInt tmp_res, tmp_mod;
+      divide(oth, tmp_res, tmp_mod);
+      res = std::move(tmp_res);
+      mod = std::move(tmp_mod);
+      return;
+    }
 
     res = 0;
     res.d_number.resize(d_number.size());
@@ -628,11 +648,20 @@ public:
   // ####################################################################
   UInt operator>>(unsigned n) const {
     UInt out;
-    out.d_number.resize(d_number.size());
+    if (n >= num_bits())
+      return out;
 
-    size_t const max_idx = num_bits() - n;
-    for (size_t idx = 0; idx < max_idx; ++idx)
-      out.set_bit(idx, bit(idx + n));
+    size_t const skip = n / (sizeof(UInt_t) * 4);
+    size_t const shift = n % (sizeof(UInt_t) * 4);
+    out.d_number.resize(d_number.size() - skip);
+
+    for (size_t idx = 0; idx < out.d_number.size(); ++idx) {
+      out.d_number[idx] = d_number[idx + skip] >> shift;
+      if (idx + skip + 1 < d_number.size())
+        out.d_number[idx] |=
+            (d_number[idx + skip + 1] << (sizeof(UInt_t) * 4 - shift)) %
+            (UInt_t(1) << (sizeof(UInt_t) * 4));
+    }
 
     out.remove_leading_zeroes();
 
@@ -766,8 +795,8 @@ inline std::istream &operator>>(std::istream &is, UInt &s) {
 
   try {
     s = UInt(temp);
-  } catch (Str_UInt::Exception &e) {
-    is.exceptions(std::istream::failbit);
+  } catch (UInt::Exception &e) {
+    is.setstate(std::istream::failbit);
   }
 
   return is;
@@ -878,7 +907,7 @@ class Int {
 
 public:
   // ####################################################################
-  Int(long long int n = 0) : d_negative(n < 0), d_number(n < 0 ? -n : n) {}
+  Int(long long int n = 0) : d_negative(n < 0), d_number(n < 0 ? 0ULL - n : n) {}
 
   // ####################################################################
   explicit Int(std::string const &inp) : d_negative(inp[0] == '-') {
@@ -934,6 +963,7 @@ public:
     d_negative =
         (d_negative && !oth.d_negative) || (!d_negative && oth.d_negative);
     d_number *= oth.d_number;
+    d_negative = d_negative && d_number;
     return *this;
   }
 
@@ -961,6 +991,14 @@ public:
 
   // ####################################################################
   void divide(Int const &oth, Int &res, Int &mod) const {
+    if (&res == this || &res == &oth || &mod == this || &mod == &oth) {
+      Int tmp_res, tmp_mod;
+      divide(oth, tmp_res, tmp_mod);
+      res = tmp_res;
+      mod = tmp_mod;
+      return;
+    }
+
     try {
       d_number.divide(oth.d_number, res.d_number, mod.d_number);
     } catch (UInt::Exception &c) {
@@ -974,6 +1012,8 @@ public:
       ++res.d_number;
       mod.d_number = oth.d_number - mod.d_number;
     }
+
+    res.d_negative = res.d_negative && res.d_number;
   }
 
   // ####################################################################
@@ -1030,21 +1070,44 @@ public:
 
   // ####################################################################
   Int &operator&=(Int const &oth) {
-    d_number &= oth.d_number;
+    if (d_negative && oth.d_negative)
+      d_number = ((d_number - 1) | (oth.d_number - 1)) + 1;
+    else if (d_negative)
+      d_number = oth.d_number ^ (oth.d_number & (d_number - 1));
+    else if (oth.d_negative)
+      d_number ^= d_number & (oth.d_number - 1);
+    else
+      d_number &= oth.d_number;
     d_negative = d_negative && oth.d_negative;
     return *this;
   }
 
   // ####################################################################
   Int &operator|=(Int const &oth) {
-    d_number |= oth.d_number;
+    if (d_negative && oth.d_negative)
+      d_number = ((d_number - 1) & (oth.d_number - 1)) + 1;
+    else if (d_negative) {
+      UInt const neg(d_number - 1);
+      d_number = (neg ^ (neg & oth.d_number)) + 1;
+    } else if (oth.d_negative) {
+      UInt const neg(oth.d_number - 1);
+      d_number = (neg ^ (neg & d_number)) + 1;
+    } else
+      d_number |= oth.d_number;
     d_negative = d_negative || oth.d_negative;
     return *this;
   }
 
   // ####################################################################
   Int &operator^=(Int const &oth) {
-    d_number ^= oth.d_number;
+    if (d_negative && oth.d_negative)
+      d_number = (d_number - 1) ^ (oth.d_number - 1);
+    else if (d_negative)
+      d_number = ((d_number - 1) ^ oth.d_number) + 1;
+    else if (oth.d_negative)
+      d_number = (d_number ^ (oth.d_number - 1)) + 1;
+    else
+      d_number ^= oth.d_number;
     d_negative =
         (d_negative && !oth.d_negative) || (!d_negative && oth.d_negative);
     return *this;
@@ -1058,7 +1121,10 @@ public:
 
   // ####################################################################
   Int &operator>>=(unsigned n) {
-    d_number >>= n;
+    if (d_negative)
+      d_number = ((d_number - 1) >> n) + 1;
+    else
+      d_number >>= n;
     return *this;
   }
 
@@ -1080,10 +1146,23 @@ public:
   size_t num_bits() const { return d_number.num_bits(); }
 
   // ####################################################################
-  bool bit(size_t pos) const { return d_number.bit(pos); }
+  bool bit(size_t pos) const {
+    if (d_negative)
+      for (size_t idx = 0; idx < pos; ++idx)
+        if (d_number.bit(idx))
+          return !d_number.bit(pos);
+    return d_number.bit(pos);
+  }
 
   // ####################################################################
-  void set_bit(size_t pos, bool val) { d_number.set_bit(pos, val); }
+  void set_bit(size_t pos, bool val) {
+    if (d_negative) {
+      UInt neg(d_number - 1);
+      neg.set_bit(pos, !val);
+      d_number = neg + 1;
+    } else
+      d_number.set_bit(pos, val);
+  }
 
   // ####################################################################
   int compare(Int const &oth) const {
@@ -1105,12 +1184,7 @@ public:
 
   // ####################################################################
   long long ll() const {
-    long long out = 0;
-    size_t const max =
-        (sizeof(out) - 1) * 8 < num_bits() ? (sizeof(out) - 1) * 8 : num_bits();
-    for (size_t idx = 0; idx < max; ++idx)
-      if (bit(idx))
-        out |= 1ULL << idx;
+    unsigned long long const out = d_number.ull();
     return d_negative ? -out : out;
   }
 
@@ -1147,8 +1221,8 @@ inline std::istream &operator>>(std::istream &is, Int &s) {
 
   try {
     s = Int(temp);
-  } catch (UInt::Exception &e) {
-    is.exceptions(std::istream::failbit);
+  } catch (Int::Exception &e) {
+    is.setstate(std::istream::failbit);
   }
 
   return is;

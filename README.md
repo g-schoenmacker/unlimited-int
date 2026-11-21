@@ -480,7 +480,7 @@ The Unlimited::Int represents a signed integral number of arbitrary precision.
  </tr>
  <tr>
   <td valign='top'><pre>Int operator&(Int const &, Int const &)</pre></td>
-  <td valign='top'>Bitwise AND operator. Result is negative if and only if both operands are negative. </td>
+  <td valign='top'>Bitwise AND operator. Operates on the two's complement representation, as int does. Result is negative if and only if both operands are negative. </td>
  </tr>
  <tr>
   <td valign='top'><pre>Int &Int::operator&=(Int const &oth)</pre></td>
@@ -488,7 +488,7 @@ The Unlimited::Int represents a signed integral number of arbitrary precision.
  </tr>
  <tr>
   <td valign='top'><pre>Int operator|(Int const &, Int const &)</pre></td>
-  <td valign='top'>Bitwise OR operator. Result is negative if one or both operands are negative. </td>
+  <td valign='top'>Bitwise OR operator. Operates on the two's complement representation, as int does. Result is negative if one or both operands are negative. </td>
  </tr>
  <tr>
   <td valign='top'><pre>Int &Int::operator|=(Int const &oth)</pre></td>
@@ -496,7 +496,7 @@ The Unlimited::Int represents a signed integral number of arbitrary precision.
  </tr>
  <tr>
   <td valign='top'><pre>Int operator^(Int const &, Int const &)</pre></td>
-  <td valign='top'>Bitwise XOR operator. Result is negative if and only if one of the operands is negative. </td>
+  <td valign='top'>Bitwise XOR operator. Operates on the two's complement representation, as int does. Result is negative if and only if one of the operands is negative. </td>
  </tr>
  <tr>
   <td valign='top'><pre>Int &Int::operator^=(Int const &oth)</pre></td>
@@ -512,7 +512,7 @@ The Unlimited::Int represents a signed integral number of arbitrary precision.
  </tr>
  <tr>
   <td valign='top'><pre>Int Int::operator>>(unsigned) const</pre></td>
-  <td valign='top'>Right-shift operator. Does not affect sign. Takes unsigned argument (and not Int). </td>
+  <td valign='top'>Right-shift operator. Does not affect sign. Rounds down (arithmetic shift), as int does: -7 >> 1 is -4. Takes unsigned argument (and not Int). </td>
  </tr>
  <tr>
   <td valign='top'><pre>Int &Int::operator>>=(unsigned)</pre></td>
@@ -533,11 +533,11 @@ The Unlimited::Int represents a signed integral number of arbitrary precision.
  </tr>
  <tr>
   <td valign='top'><pre>bool Int::bit(size_t n) const</pre></td>
-  <td valign='top'>Returns the value of the _n_ th bit in the number. Returns true if bit is set, false otherwise. If the _n_ th bit does not currently exist, false is returned. </td>
+  <td valign='top'>Returns the value of the _n_ th bit of the two's complement representation, as int does. Returns true if bit is set, false otherwise. If the _n_ th bit does not currently exist, false is returned for a non-negative number and true for a negative number. </td>
  </tr>
  <tr>
   <td valign='top'><pre>void Int::set_bit(size_t n, bool val)</pre></td>
-  <td valign='top'>Sets the value of bit _n_ to _val_. If the _n_ th bit does not currently exist, number is enlarged. </td>
+  <td valign='top'>Sets the value of bit _n_ of the two's complement representation to _val_, as int does: -1 with bit 5 cleared is -33. If the _n_ th bit does not currently exist, number is enlarged. </td>
  </tr>
 </table>
 

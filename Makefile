@@ -5,7 +5,7 @@
 
 # Compiler, flags and include directories (-I)
 CC    := g++
-CCFL  := -Wall -Werror -Wextra -std=c++11 -O3
+CCFL  := -Wall -Werror -Wextra -std=c++23 -O3
 INC   := 
 
 # Linker, flags and external libraries (-l) 

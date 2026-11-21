@@ -23,6 +23,14 @@ void Unlimited::Int::divide(
     Int &mod        // the remainder (modulus) of the division
 ) const {
 
+  if (&res == this || &res == &oth || &mod == this || &mod == &oth) {
+    Int tmp_res, tmp_mod;
+    divide(oth, tmp_res, tmp_mod);
+    res = tmp_res;
+    mod = tmp_mod;
+    return;
+  }
+
   try {
     d_number.divide(oth.d_number, res.d_number, mod.d_number);
   } catch (UInt::Exception &c) {
@@ -42,4 +50,6 @@ void Unlimited::Int::divide(
     ++res.d_number;
     mod.d_number = oth.d_number - mod.d_number;
   }
+
+  res.d_negative = res.d_negative && res.d_number;
 }

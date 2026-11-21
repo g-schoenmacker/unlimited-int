@@ -29,6 +29,14 @@ void Unlimited::UInt::divide(
   if (!oth)
     throw Exception("divide error: Division by zero");
 
+  if (&res == this || &res == &oth || &mod == this || &mod == &oth) {
+    UInt tmp_res, tmp_mod;
+    divide(oth, tmp_res, tmp_mod);
+    res = std::move(tmp_res);
+    mod = std::move(tmp_mod);
+    return;
+  }
+
   res = 0;
   res.d_number.resize(d_number.size());
   mod = 0;

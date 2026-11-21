@@ -2,18 +2,14 @@
 
 // ############################################################################
 // UInt string constructor.
-// Uses Str_UInt to convert the string to a number and thus is limited to what
-// the Str_UInt string constructor can do. After the Str_UInt construction is
-// done, chunks fitting in [s_max_val] are removed one at a time, parallel to
-// the method in the uint contructor.
-//
-// This constructor uses the Str_UInt::divide method and is thus quite slow.
-// If your code relies heavily on string construction/conversion and arithmetic
-// is incidental, it may be faster to use Str_UInt directly. In any other case,
-// UInt is the better class to use because of its much faster arithmetic.
+// Uses Str_UInt to validate the string and thus is limited to what the
+// Str_UInt string constructor can do. After validation, the decimal digits are
+// processed in chunks of at most nine: each digit of [d_number] is multiplied
+// by the chunk's power of ten and the chunk is added, after which consolidate()
+// restores the internal representation, as in multiplication and addition.
 // ############################################################################
 
-Unlimited::UInt::UInt(std::string const &inp) {
+Unlimited::UInt::UInt(std::string const &inp) : d_number(1) {
 
   Str_UInt val;
   try {
@@ -22,18 +18,18 @@ Unlimited::UInt::UInt(std::string const &inp) {
     throw Exception(e.what());
   }
 
-  if (!val)
-    d_number.push_back(0);
+  std::string const digits(val.str());
+  for (size_t idx = 0; idx < digits.size(); idx += 9) {
+    UInt_t scale = 1;
+    UInt_t chunk = 0;
+    for (size_t cidx = idx; cidx < idx + 9 && cidx < digits.size(); ++cidx) {
+      scale *= 10;
+      chunk = chunk * 10 + (digits[cidx] - '0');
+    }
 
-  while (val) {
-    Str_UInt div, mod;
-    val.divide(s_max_val, div, mod);
-
-    std::istringstream ss(mod.str());
-    UInt_t temp;
-    ss >> temp;
-
-    d_number.push_back(temp);
-    val = div;
+    for (size_t nidx = 0; nidx < d_number.size(); ++nidx)
+      d_number[nidx] *= scale;
+    d_number[0] += chunk;
+    consolidate();
   }
 }

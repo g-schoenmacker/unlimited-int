@@ -184,7 +184,7 @@ inline Int operator^(Int const &rhs, Int const &lhs) {
 
 // Int constructor.
 inline Int::Int(long long int n)
-    : d_negative(n < 0), d_number(n < 0 ? -n : n){};
+    : d_negative(n < 0), d_number(n < 0 ? 0ULL - n : n){};
 
 // UInt constructor.
 inline Int::Int(UInt const &uint) : d_negative(false), d_number(uint){};
@@ -195,6 +195,7 @@ inline Int &Int::operator*=(Int const &oth) {
   d_negative =
       (d_negative && !oth.d_negative) || (!d_negative && oth.d_negative);
   d_number *= oth.d_number;
+  d_negative = d_negative && d_number;
   return *this;
 }
 
@@ -260,19 +261,42 @@ inline Int &Int::operator--() { return *this -= 1; }
 
 // Definition of bitwise assignment operators. Note they DO affect sign.
 inline Int &Int::operator&=(Int const &oth) {
-  d_number &= oth.d_number;
+  if (d_negative && oth.d_negative)
+    d_number = ((d_number - 1) | (oth.d_number - 1)) + 1;
+  else if (d_negative)
+    d_number = oth.d_number ^ (oth.d_number & (d_number - 1));
+  else if (oth.d_negative)
+    d_number ^= d_number & (oth.d_number - 1);
+  else
+    d_number &= oth.d_number;
   d_negative = d_negative && oth.d_negative;
   return *this;
 }
 
 inline Int &Int::operator|=(Int const &oth) {
-  d_number |= oth.d_number;
+  if (d_negative && oth.d_negative)
+    d_number = ((d_number - 1) & (oth.d_number - 1)) + 1;
+  else if (d_negative) {
+    UInt const neg(d_number - 1);
+    d_number = (neg ^ (neg & oth.d_number)) + 1;
+  } else if (oth.d_negative) {
+    UInt const neg(oth.d_number - 1);
+    d_number = (neg ^ (neg & d_number)) + 1;
+  } else
+    d_number |= oth.d_number;
   d_negative = d_negative || oth.d_negative;
   return *this;
 }
 
 inline Int &Int::operator^=(Int const &oth) {
-  d_number ^= oth.d_number;
+  if (d_negative && oth.d_negative)
+    d_number = (d_number - 1) ^ (oth.d_number - 1);
+  else if (d_negative)
+    d_number = ((d_number - 1) ^ oth.d_number) + 1;
+  else if (oth.d_negative)
+    d_number = (d_number ^ (oth.d_number - 1)) + 1;
+  else
+    d_number ^= oth.d_number;
   d_negative =
       (d_negative && !oth.d_negative) || (!d_negative && oth.d_negative);
   return *this;
@@ -280,7 +304,10 @@ inline Int &Int::operator^=(Int const &oth) {
 
 // Definition of shift assign operators. Shifts do not affect sign.
 inline Int &Int::operator>>=(unsigned n) {
-  d_number >>= n;
+  if (d_negative)
+    d_number = ((d_number - 1) >> n) + 1;
+  else
+    d_number >>= n;
   return *this;
 }
 
@@ -307,10 +334,23 @@ inline Int Int::operator>>(unsigned n) const {
 inline size_t Int::num_bits() const { return d_number.num_bits(); }
 
 // Method bit(pos) returns true if bit at pos is set.
-inline bool Int::bit(size_t pos) const { return d_number.bit(pos); }
+inline bool Int::bit(size_t pos) const {
+  if (d_negative)
+    for (size_t idx = 0; idx < pos; ++idx)
+      if (d_number.bit(idx))
+        return !d_number.bit(pos);
+  return d_number.bit(pos);
+}
 
 // Method set_bit(pos, val) sets bit at [pos] to [val].
-inline void Int::set_bit(size_t pos, bool val) { d_number.set_bit(pos, val); }
+inline void Int::set_bit(size_t pos, bool val) {
+  if (d_negative) {
+    UInt neg(d_number - 1);
+    neg.set_bit(pos, !val);
+    d_number = neg + 1;
+  } else
+    d_number.set_bit(pos, val);
+}
 
 // The bool operator does not use compare() to avoid the overhead of
 // constructing Int(0) for each comparison.

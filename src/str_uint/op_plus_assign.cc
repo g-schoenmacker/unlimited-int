@@ -7,6 +7,9 @@
 
 Unlimited::Str_UInt &Unlimited::Str_UInt::operator+=(Str_UInt const &oth) {
 
+  if (this == &oth)
+    return *this += Str_UInt(oth);
+
   size_t const o_len = oth.length();
 
   // Make sure [*this] is at least as big as [oth].

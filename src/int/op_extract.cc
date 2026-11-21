@@ -15,8 +15,8 @@ std::istream &Unlimited::operator>>(std::istream &is, Int &s) {
 
   try {
     s = Int(temp);
-  } catch (UInt::Exception &e) {
-    is.exceptions(std::istream::failbit);
+  } catch (Int::Exception &e) {
+    is.setstate(std::istream::failbit);
   }
 
   return is;

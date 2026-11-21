@@ -8,11 +8,6 @@
 // ############################################################################
 
 long long Unlimited::Int::ll() const {
-  long long out = 0;
-  size_t const max =
-      (sizeof(out) - 1) * 8 < num_bits() ? (sizeof(out) - 1) * 8 : num_bits();
-  for (size_t idx = 0; idx < max; ++idx)
-    if (bit(idx))
-      out |= 1ULL << idx;
+  unsigned long long const out = d_number.ull();
   return d_negative ? -out : out;
 }

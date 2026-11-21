@@ -285,5 +285,98 @@ void uint_test() {
 
   assert(UInt("1234567").ull() == 1234567ULL);
 
+  std::cout << "Testing string construction at digit boundaries...\n";
+  assert(UInt("4294967296") == (UInt(1) << 32));
+  assert(UInt("18446744073709551616") == (UInt(1) << 64));
+  assert(UInt("4294967296") - 1 == UInt(4294967295ULL));
+  for (unsigned pos = 0; pos < 200; ++pos) {
+    UInt const pow2 = UInt(1) << pos;
+    assert(UInt(pow2.str()) == pow2);
+    assert(UInt((pow2 + 1).str()) == pow2 + 1);
+    if (pos)
+      assert(UInt((pow2 - 1).str()) == pow2 - 1);
+  }
+
+  std::cout << "Testing right shift at digit boundaries...\n";
+  {
+    std::vector<UInt> vals = {UInt(0),
+                              UInt(1),
+                              UInt(4294967295ULL),
+                              UInt(4294967296ULL),
+                              UInt(~0ULL),
+                              (UInt(1) << 96) - 1,
+                              (UInt(1) << 128) + 12345,
+                              UInt("987654321987654321987654321987654321987")};
+    for (size_t idx = 0; idx < vals.size(); ++idx) {
+      for (unsigned shift = 0; shift <= 140; ++shift) {
+        UInt const pow2 = UInt(1) << shift;
+        UInt const out = vals[idx] >> shift;
+        assert(out == vals[idx] / pow2);
+        assert((out << shift) + vals[idx] % pow2 == vals[idx]);
+      }
+    }
+  }
+
+  std::cout << "Testing right shift past all bits...\n";
+  assert((UInt(5) >> 32) == UInt(0));
+  assert((UInt(5) >> 33) == UInt(0));
+  assert((UInt(5) >> 100) == UInt(0));
+  assert((UInt("987654321987654321987654321") >> 1000) == UInt(0));
+  {
+    UInt val(5);
+    val >>= 100;
+    assert(val == UInt(0));
+  }
+
+  std::cout << "Testing stream extract failure...\n";
+  {
+    std::istringstream bad("abc");
+    UInt val(7);
+    bool threw = false;
+    try {
+      bad >> val;
+    } catch (...) {
+      threw = true;
+    }
+    assert(!threw);
+    assert(bad.fail());
+  }
+
+  std::cout << "Testing divide with aliased arguments...\n";
+  {
+    UInt num(17), den(5), res, mod;
+    num.divide(den, num, mod);
+    assert(num == UInt(3) && mod == UInt(2));
+    num = 17;
+    num.divide(den, res, den);
+    assert(res == UInt(3) && den == UInt(2));
+    num = 17;
+    num.divide(num, res, num);
+    assert(res == UInt(1) && num == UInt(0));
+    num = 17;
+    den = 5;
+    num.divide(den, den, num);
+    assert(den == UInt(3) && num == UInt(2));
+    UInt big("123456789123456789123456789123456789");
+    UInt const copy(big);
+    big.divide(UInt("987654321987654321"), big, mod);
+    assert(big == copy / UInt("987654321987654321"));
+    assert(mod == copy % UInt("987654321987654321"));
+  }
+
+  std::cout << "Testing string construction of large numbers...\n";
+  for (size_t len = 1; len <= 40; ++len) {
+    assert(UInt(std::string(len, '9')) == UInt(10).powc(len) - 1);
+    assert(UInt("1" + std::string(len, '0')) == UInt(10).powc(len));
+    assert(UInt(std::string(len, '0') + "123") == UInt(123));
+  }
+  assert(UInt("1" + std::string(10000, '0')) == UInt(10).powc(10000));
+  {
+    std::string digits;
+    for (size_t idx = 0; idx < 10000; ++idx)
+      digits += char('1' + idx * 7 % 9);
+    assert(UInt(digits).str() == digits);
+  }
+
   std::cout << "\n ----- End UInt tests ----- \n\n";
 }

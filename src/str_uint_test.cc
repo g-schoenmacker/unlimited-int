@@ -202,5 +202,67 @@ void str_uint_test() {
   }
   assert(!(ss >> dig));
 
+  std::cout << "Testing division when remainder equals divisor...\n";
+  assert(Str_UInt(5) / Str_UInt(5) == Str_UInt(1));
+  assert(Str_UInt(5) % Str_UInt(5) == Str_UInt(0));
+  assert(Str_UInt(123) / Str_UInt(123) == Str_UInt(1));
+  assert(Str_UInt(1000) / Str_UInt(1000) == Str_UInt(1));
+  assert(Str_UInt(20) / Str_UInt(10) == Str_UInt(2));
+  assert(Str_UInt("4294967296") / Str_UInt("4294967296") == Str_UInt(1));
+  for (unsigned long long num = 0; num < 200; ++num) {
+    for (unsigned long long den = 1; den < 30; ++den) {
+      Str_UInt res, mod;
+      Str_UInt(num).divide(den, res, mod);
+      assert(res == Str_UInt(num / den));
+      assert(mod == Str_UInt(num % den));
+    }
+  }
+
+  std::cout << "Testing stream extract failure...\n";
+  {
+    std::istringstream bad("abc");
+    Str_UInt val(7);
+    bool threw = false;
+    try {
+      bad >> val;
+    } catch (...) {
+      threw = true;
+    }
+    assert(!threw);
+    assert(bad.fail());
+  }
+
+  std::cout << "Testing addition to self...\n";
+  {
+    Str_UInt val(18386549);
+    val += val;
+    assert(val == Str_UInt(36773098));
+    val = Str_UInt("99999999999999999999");
+    val += val;
+    assert(val == Str_UInt("199999999999999999998"));
+    for (unsigned long long num = 0; num < 2000; num += 7) {
+      Str_UInt twice(num);
+      twice += twice;
+      assert(twice == Str_UInt(num * 2));
+    }
+  }
+
+  std::cout << "Testing divide with aliased arguments...\n";
+  {
+    Str_UInt num(17), den(5), res, mod;
+    num.divide(den, num, mod);
+    assert(num == Str_UInt(3) && mod == Str_UInt(2));
+    num = 17;
+    num.divide(den, res, den);
+    assert(res == Str_UInt(3) && den == Str_UInt(2));
+    num = 17;
+    num.divide(num, res, num);
+    assert(res == Str_UInt(1) && num == Str_UInt(0));
+    num = 17;
+    den = 5;
+    num.divide(den, den, num);
+    assert(den == Str_UInt(3) && num == Str_UInt(2));
+  }
+
   std::cout << "\n ----- End Str_UInt tests ----- \n\n";
 }
